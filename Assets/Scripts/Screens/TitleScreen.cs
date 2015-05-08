@@ -14,7 +14,7 @@ public class TitleScreen : MonoBehaviour {
 	/// </summary>
 	public void StartGame()
 	{
-
+		Debug.Log("Starting Game");
 	}
 
 
@@ -23,7 +23,7 @@ public class TitleScreen : MonoBehaviour {
 	/// </summary>
 	public void OpenSettings()
 	{
-
+		Debug.Log("Opening Settings");
 	}
 
 
@@ -32,7 +32,7 @@ public class TitleScreen : MonoBehaviour {
 	/// </summary>
 	public void OpenWebsite()
 	{
-
+		Debug.Log("Opening Website");
 	}
 
 
@@ -41,6 +41,6 @@ public class TitleScreen : MonoBehaviour {
 	/// </summary>
 	public void OpenRules()
 	{
-
+		Debug.Log("Opening Rules");
 	}
 }
