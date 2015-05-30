@@ -14,7 +14,7 @@ public class TitleScreen : MonoBehaviour {
 	/// </summary>
 	public void StartGame()
 	{
-		Debug.Log("Starting Game");
+		Application.LoadLevel("Phase1");
 	}
 
 
