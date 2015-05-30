@@ -7,6 +7,7 @@ public class ChoiceButton : MonoBehaviour{
 	public Text text;
 	public int choiceNum = -1;
 	EncounterScreen parent;
+
 	// Use this for initialization
 	void Start () {
 		parent = GetComponentInParent<EncounterScreen>();
@@ -21,22 +22,30 @@ public class ChoiceButton : MonoBehaviour{
 		parent.AddChoice(choiceNum, this);
 	}
 
-	public bool IsSelected()
-	{
-		return selectedMarker.IsActive();
-	}
 
-
+	/// <summary>
+	/// Sets the text on the button
+	/// </summary>
+	/// <param name="newText">text to be put on button</param>
 	public void SetText(string newText)
 	{
 		text.text = newText;
 	}
 
+
+	/// <summary>
+	/// Makes selected marker active state match given bool.
+	/// </summary>
 	public void Select(bool makeActive)
 	{
 		selectedMarker.gameObject.SetActive(makeActive);
 	}
 
+
+	/// <summary>
+	/// Callback function for when this button is clicked.
+	/// Tells the Encounter script that it has been clicked.
+	/// </summary>
 	public void ChoiceClicked()
 	{
 		parent.ChoiceClicked(choiceNum);

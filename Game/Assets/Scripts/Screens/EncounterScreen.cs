@@ -4,6 +4,7 @@ using System.Collections;
 public class EncounterScreen : MonoBehaviour {
 	ChoiceButton[] choices = new ChoiceButton[4];
 	bool choiceChosen = false;
+	int chosenChoiceIndex = -1;
 
 	// Use this for initialization
 	void Start () {
@@ -15,11 +16,15 @@ public class EncounterScreen : MonoBehaviour {
 	
 	}
 
+
+	/// <summary>
+	/// Callback function for when the submit button is clicked.
+	/// </summary>
 	public void Submit()
 	{
 		if (choiceChosen)
 		{
-			Debug.Log("Submit!");
+			Debug.LogFormat("Submit choice {0}!", chosenChoiceIndex);
 		}
 		else
 		{
@@ -28,6 +33,10 @@ public class EncounterScreen : MonoBehaviour {
 	}
 
 
+	/// <summary>
+	/// Adds a choice to be kept by the encounter screen.
+	/// will only accept choices with certain indexes.
+	/// </summary>
 	public void AddChoice(int choiceNum, ChoiceButton choice)
 	{
 		if (choiceNum < choices.Length)
@@ -42,9 +51,15 @@ public class EncounterScreen : MonoBehaviour {
 	}
 
 
+	/// <summary>
+	/// Method called by choices when they are clicked.
+	/// marks given choice as selected and marks the rest unselected.
+	/// </summary>
+	/// <param name="choiceNum"></param>
 	public void ChoiceClicked(int choiceNum)
 	{
 		choiceChosen = true;
+		chosenChoiceIndex = choiceNum;
 		for (int i = 0; i < choices.Length; i++ )
 		{
 			if (choices[i] != null)
