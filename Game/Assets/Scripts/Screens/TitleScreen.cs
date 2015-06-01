@@ -5,7 +5,7 @@ public class TitleScreen : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
-	
+		GameMaster.Instance().LoadEncounters();
 	}
 
 

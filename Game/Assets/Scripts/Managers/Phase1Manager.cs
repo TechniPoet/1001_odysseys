@@ -3,16 +3,18 @@ using System.Collections;
 
 public class Phase1Manager : MonoBehaviour {
 
+	static Phase1Manager singleton = null;
 	public GameObject WorldAsker;
 	public GameObject Encounter;
-	// Use this for initialization
-	void Start () {
-	
+
+	void Start()
+	{
+		singleton = this;
 	}
-	
-	// Update is called once per frame
-	void Update () {
-	
+
+	public static Phase1Manager Instance()
+	{
+		return singleton;
 	}
 
 	public void StartEncounter()
