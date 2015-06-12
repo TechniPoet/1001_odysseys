@@ -2,6 +2,8 @@
 using UnityEngine.UI;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using System.Collections.Generic;
+using System.Collections;
 
 namespace UIWidgets
 {
@@ -9,7 +11,7 @@ namespace UIWidgets
 	/// <summary>
 	/// Base class for custom combobox.
 	/// </summary>
-	public class ComboboxCustom<TListViewCustom,TComponent,TItem> : MonoBehaviour
+	public class ComboboxCustom<TListViewCustom,TComponent,TItem> : MonoBehaviour, ISubmitHandler
 			where TListViewCustom : ListViewCustom<TComponent,TItem>
 			where TComponent : ListViewItem
 	{
@@ -35,17 +37,31 @@ namespace UIWidgets
 			set {
 				if (listView!=null)
 				{
+					listParent = null;
+
 					listView.OnSelectObject.RemoveListener(SetCurrent);
 					listView.OnSelectObject.RemoveListener(onSelectCallback);
-					listView.OnFocusOut.RemoveListener(HideList);
+					listView.OnFocusOut.RemoveListener(onFocusHideList);
+
+					listView.onCancel.RemoveListener(OnListViewCancel);
+					listView.onItemCancel.RemoveListener(OnListViewCancel);
+
+					RemoveDeselectCallbacks();
 				}
 				listView = value;
 				if (listView!=null)
 				{
 					listParent = listView.transform.parent;
+
 					listView.OnSelectObject.AddListener(SetCurrent);
 					listView.OnSelectObject.AddListener(onSelectCallback);
-					listView.OnFocusOut.AddListener(HideList);
+
+					listView.OnFocusOut.AddListener(onFocusHideList);
+
+					listView.onCancel.AddListener(OnListViewCancel);
+					listView.onItemCancel.AddListener(OnListViewCancel);
+
+					AddDeselectCallbacks();
 				}
 			}
 		}
@@ -99,11 +115,25 @@ namespace UIWidgets
 		Transform listCanvas;
 		Transform listParent;
 
+		void Awake()
+		{
+			Start();
+		}
+		
+		[System.NonSerialized]
+		private bool isStartedComboboxCustom;
+
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public virtual void Start()
 		{
+			if (isStartedComboboxCustom)
+			{
+				return ;
+			}
+			isStartedComboboxCustom = true;
+
 			onSelectCallback = (index) => OnSelect.Invoke(index, listView.Items[index]);
 
 			ToggleButton = toggleButton;
@@ -112,6 +142,8 @@ namespace UIWidgets
 
 			if (listView!=null)
 			{
+				listView.OnSelectObject.RemoveListener(SetCurrent);
+
 				listCanvas = Utilites.FindCanvas(listParent);
 
 				listView.gameObject.SetActive(true);
@@ -148,6 +180,7 @@ namespace UIWidgets
 			{
 				return ;
 			}
+
 			if (listView.gameObject.activeSelf)
 			{
 				HideList();
@@ -157,7 +190,9 @@ namespace UIWidgets
 				ShowList();
 			}
 		}
-		
+
+		bool isOpeningList;
+
 		/// <summary>
 		/// Shows the list.
 		/// </summary>
@@ -173,9 +208,12 @@ namespace UIWidgets
 				listView.transform.SetParent(listCanvas);
 			}
 			listView.gameObject.SetActive(true);
-			EventSystem.current.SetSelectedGameObject(listView.gameObject);
+			if (listView.SelectComponent())
+			{
+				 SetChildDeselectListener(EventSystem.current.currentSelectedGameObject);
+			}
 		}
-		
+
 		/// <summary>
 		/// Hides the list.
 		/// </summary>
@@ -185,6 +223,7 @@ namespace UIWidgets
 			{
 				return ;
 			}
+
 			listView.gameObject.SetActive(false);
 			if (listCanvas!=null)
 			{
@@ -192,9 +231,109 @@ namespace UIWidgets
 			}
 		}
 
+		List<SelectListener> childrenDeselect = new List<SelectListener>();
+		void onFocusHideList(BaseEventData eventData)
+		{
+			if (eventData.selectedObject==gameObject)
+			{
+				return ;
+			}
+
+			var ev_item = eventData as ListViewItemEventData;
+			if (ev_item!=null)
+			{
+				if (ev_item.NewSelectedObject!=null)
+				{
+					SetChildDeselectListener(ev_item.NewSelectedObject);
+				}
+				return ;
+			}
+
+			var ev = eventData as PointerEventData;
+			if (ev==null)
+			{
+				HideList();
+				return ;
+			}
+			if (ev.pointerEnter==null)
+			{
+				HideList();
+				return ;
+			}
+
+			if (ev.pointerEnter.Equals(toggleButton.gameObject))
+			{
+				return ;
+			}
+			if (ev.pointerEnter.transform.IsChildOf(listView.transform))
+			{
+				SetChildDeselectListener(ev.pointerEnter);
+				return ;
+			}
+
+			HideList();
+		}
+
+		void SetChildDeselectListener(GameObject child)
+		{
+			var deselectListener = GetDeselectListener(child);
+			if (!childrenDeselect.Contains(deselectListener))
+			{
+				deselectListener.onDeselect.AddListener(onFocusHideList);
+				childrenDeselect.Add(deselectListener);
+			}
+		}
+
+		SelectListener GetDeselectListener(GameObject go)
+		{
+			return go.GetComponent<SelectListener>() ?? go.AddComponent<SelectListener>();
+		}
+
+		void AddDeselectCallbacks()
+		{
+			if (listView.ScrollRect!=null)
+			{
+				var scrollbar = listView.ScrollRect.verticalScrollbar.gameObject;
+				var deselectListener = GetDeselectListener(scrollbar);
+
+				deselectListener.onDeselect.AddListener(onFocusHideList);
+				childrenDeselect.Add(deselectListener);
+			}
+		}
+
+		void RemoveDeselectCallbacks()
+		{
+			childrenDeselect.ForEach(x => {
+				if (x!=null)
+				{
+					x.onDeselect.RemoveListener(onFocusHideList);
+				}
+			});
+			childrenDeselect.Clear();
+		}
+
 		void SetCurrent(int index)
 		{
 			UpdateCurrent();
+
+			if (!EventSystem.current.alreadySelecting)
+			{
+				EventSystem.current.SetSelectedGameObject(gameObject);
+			}
+		}
+
+		void OnListViewCancel()
+		{
+			HideList();
+		}
+
+		/// <summary>
+		/// Raises the submit event.
+		/// </summary>
+		/// <param name="eventData">Event data.</param>
+		void ISubmitHandler.OnSubmit(BaseEventData eventData)
+		{
+			ShowList();
 		}
 
 		/// <summary>

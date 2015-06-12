@@ -96,10 +96,23 @@ namespace UIWidgets
 		/// <value>The name of the template.</value>
 		public string TemplateName { get; set; }
 
+		static Templates<Dialog> templates;
+
 		/// <summary>
 		/// Dialog templates.
 		/// </summary>
-		public static Templates<Dialog> Templates = new Templates<Dialog>();
+		public static Templates<Dialog> Templates {
+			get {
+				if (templates==null)
+				{
+					templates = new Templates<Dialog>();
+				}
+				return templates;
+			}
+			set {
+				templates = value;
+			}
+		}
 
 		void Awake()
 		{
@@ -108,11 +121,12 @@ namespace UIWidgets
 				gameObject.SetActive(false);
 			}
 		}
-		
+
 		void OnDestroy()
 		{
 			if (!IsTemplate)
 			{
+				templates = null;
 				return ;
 			}
 			//if FindTemplates never called than TemplateName==null

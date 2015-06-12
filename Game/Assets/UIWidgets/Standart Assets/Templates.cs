@@ -137,10 +137,15 @@ namespace UIWidgets {
 			{
 				FindTemplates();
 			}
-			
-			if ((!Exists(name)) || (templates[name]==null))
+
+			if (!Exists(name))
 			{
 				throw new ArgumentException("Not found template with name '" + name + "'");
+			}
+			if (templates[name]==null)
+			{
+				templates.Clear();
+				FindTemplates();
 			}
 			
 			T template;

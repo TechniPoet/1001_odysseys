@@ -120,14 +120,20 @@ public class UITestSamples : MonoBehaviour
 
 	public void ShowDialogSignIn()
 	{
+		// create dialog from template
 		var dialog = Dialog.Template("DialogSignInTemplateSample");
+		// helper component with references to input fields
 		var helper = dialog.GetComponent<DialogInputHelper>();
+		// reset input fields to default
 		helper.Refresh();
 
+		// open dialog
 		dialog.Show(
 			title: "Sign into your Account",
 			buttons: new DialogActions(){
+				// on click call SignInNotify
 				{"Sign in", () => SignInNotify(helper)},
+				// on click close dialog
 				{"Cancel", Dialog.Close},
 			},
 			focusButton: "Sign in",
@@ -136,16 +142,21 @@ public class UITestSamples : MonoBehaviour
 		);
 	}
 
+	// using dialog
 	bool SignInNotify(DialogInputHelper helper)
 	{
+		// return true if Username.text and Password not empty, otherwise false
 		if (!helper.Validate())
 		{
+			// return false to keep dialog open
 			return false;
 		}
 
+		// using dialog input 
 		var message = "Sign in.\nUsername: " + helper.Username.text + "\nPassword: <hidden>";
 		Notify.Template("NotifyTemplateAutoHide").Show(message, customHideDelay: 3f);
 
+		// return true to close dialog
 		return true;
 	}
 }

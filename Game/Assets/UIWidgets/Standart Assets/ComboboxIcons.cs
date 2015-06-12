@@ -9,11 +9,25 @@ namespace UIWidgets
 	[AddComponentMenu("UI/ComboboxIcons", 230)]
 	public class ComboboxIcons : ComboboxCustom<ListViewIcons,ListViewIconsItemComponent,ListViewIconsItemDescription>
 	{
+		void Awake()
+		{
+			Start();
+		}
+
+		[System.NonSerialized]
+		private bool is_started;
+		
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public override void Start()
 		{
+			if (is_started)
+			{
+				return ;
+			}
+			is_started = true;
+
 			base.Start();
 		}
 
@@ -24,7 +38,7 @@ namespace UIWidgets
 		{
 			Current.SetData(ListView.SelectedItem);
 
-			base.HideList();
+			HideList();
 		}
 
 		#if UNITY_EDITOR

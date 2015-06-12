@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 namespace UIWidgets
 {
@@ -91,10 +92,23 @@ namespace UIWidgets
 		/// <value>The name of the template.</value>
 		public string TemplateName { get; set; }
 
+		static Templates<Notify> templates;
+
 		/// <summary>
 		/// Notify templates.
 		/// </summary>
-		public static Templates<Notify> Templates = new Templates<Notify>(AddCloseCallback);
+		public static Templates<Notify> Templates {
+			get {
+				if (templates==null)
+				{
+					templates = new Templates<Notify>(AddCloseCallback);
+				}
+				return templates;
+			}
+			set {
+				templates = value;
+			}
+		}
 
 		/// <summary>
 		/// Function used to run show animation.
@@ -133,6 +147,7 @@ namespace UIWidgets
 		{
 			if (!IsTemplate)
 			{
+				templates = null;
 				return ;
 			}
 			//if FindTemplates never called than TemplateName==null
@@ -312,6 +327,7 @@ namespace UIWidgets
 		{
 			RectTransform rect;
 			SlideUp slide;
+			slides = new Stack<RectTransform>(slides.Where(x => x!=null));
 			if (slides.Count==0)
 			{
 				var obj = new GameObject("SlideUp");

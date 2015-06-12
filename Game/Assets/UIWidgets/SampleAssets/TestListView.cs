@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using UIWidgets;
 
@@ -15,7 +15,7 @@ public class TestListView : MonoBehaviour {
 	
 	void Click()
 	{
-		listView.Add("0script added");
+		listView.Add("Added from script");
 		listView.Remove("Caster");
 	}
 	

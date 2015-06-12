@@ -39,9 +39,17 @@ namespace UIWidgets {
 		public override bool Equals(System.Object obj)
 		{
 			ListViewIconsItemDescription descObj = obj as ListViewIconsItemDescription; 
+
 			if (descObj == null)
+			{
 				return false;
-			return Name==descObj.Name && Icon.Equals(descObj.Icon);
+			}
+			if (((descObj.Icon==null) && (Icon!=null)) || ((descObj.Icon!=null) && (Icon==null)))
+			{
+				return false;
+			}
+
+			return Name==descObj.Name && ((Icon==null && descObj.Icon==null) || Icon.Equals(descObj.Icon));
 		}
 	}
 
@@ -50,19 +58,24 @@ namespace UIWidgets {
 	/// </summary>
 	[AddComponentMenu("UI/ListViewIcons", 252)]
 	public class ListViewIcons : ListViewCustom<ListViewIconsItemComponent,ListViewIconsItemDescription> {
+		void Awake()
+		{
+			Start();
+		}
+
 		[System.NonSerialized]
-		bool start_called2 = false;
+		bool isStartedListViewIcons = false;
 
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public override void Start()
 		{
-			if (start_called2)
+			if (isStartedListViewIcons)
 			{
 				return ;
 			}
-			start_called2 = true;
+			isStartedListViewIcons = true;
 
 			SortFunc = (x) => x.OrderBy(y => y.Name).ToList();
 			base.Start();

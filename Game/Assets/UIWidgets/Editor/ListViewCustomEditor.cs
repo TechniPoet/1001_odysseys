@@ -16,6 +16,7 @@ namespace UIWidgets
 			
 			"DefaultItem",
 			"Container",
+			"scrollRect",
 
 			"defaultColor",
 			"defaultBackgroundColor",

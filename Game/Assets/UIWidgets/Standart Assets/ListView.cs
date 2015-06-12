@@ -49,6 +49,27 @@ namespace UIWidgets
 			}
 			set {
 				UpdateItems(value);
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.value = 1f;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Gets the strings.
+		/// </summary>
+		/// <value>The strings.</value>
+		public new List<string> Items {
+			get {
+				return new List<string>(strings);
+			}
+			set {
+				UpdateItems(value);
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.value = 1f;
+				}
 			}
 		}
 
@@ -178,8 +199,9 @@ namespace UIWidgets
 		[SerializeField]
 		public ImageAdvanced DefaultItem;
 
-		List<ImageAdvanced> itemsImages = new List<ImageAdvanced>();
-		List<Text> itemsText = new List<Text>();
+		//List<ImageAdvanced> itemsImages = new List<ImageAdvanced>();
+		//List<Text> itemsText = new List<Text>();
+		List<ListViewStringComponent> components = new List<ListViewStringComponent>();
 
 		List<UnityAction<PointerEventData>> callbacksEnter = new List<UnityAction<PointerEventData>>();
 		List<UnityAction<PointerEventData>> callbacksExit = new List<UnityAction<PointerEventData>>();
@@ -205,18 +227,90 @@ namespace UIWidgets
 		/// </summary>
 		public ListViewEvent OnDeselectString = new ListViewEvent();
 
-		bool start_called = false;
+		[SerializeField]
+		ScrollRect scrollRect;
+		
+		/// <summary>
+		/// Gets or sets the ScrollRect.
+		/// </summary>
+		/// <value>The ScrollRect.</value>
+		public ScrollRect ScrollRect {
+			get {
+				return scrollRect;
+			}
+			set {
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.onValueChanged.RemoveListener(OnScroll);
+				}
+				scrollRect = value;
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.onValueChanged.AddListener(OnScroll);
+				}
+			}
+		}
+		
+		/// <summary>
+		/// The top filler.
+		/// </summary>
+		RectTransform topFiller;
+		
+		/// <summary>
+		/// The bottom filler.
+		/// </summary>
+		RectTransform bottomFiller;
+		
+		/// <summary>
+		/// The height of the DefaultItem.
+		/// </summary>
+		float itemHeight;
+		
+		/// <summary>
+		/// The height of the ScrollRect.
+		/// </summary>
+		float scrollHeight;
+		
+		/// <summary>
+		/// Count of visible items.
+		/// </summary>
+		int maxVisibleItems;
+
+		/// <summary>
+		/// Count of visible items.
+		/// </summary>
+		int visibleItems;
+		
+		/// <summary>
+		/// Count of hidden items by top filler.
+		/// </summary>
+		int topHiddenItems;
+		
+		/// <summary>
+		/// Count of hidden items by bottom filler.
+		/// </summary>
+		int bottomHiddenItems;
+
+		void Awake()
+		{
+			Start();
+		}
+
+		[System.NonSerialized]
+		bool isStartedListView = false;
+
+		EasyLayout.EasyLayout layout;
 
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public override void Start()
 		{
-			if (start_called)
+			if (isStartedListView)
 			{
 				return ;
 			}
-			start_called = true;
+			isStartedListView = true;
 
 			base.Start();
 
@@ -226,9 +320,34 @@ namespace UIWidgets
 			{
 				throw new NullReferenceException("DefaultItem is null. Set component of type ImageAdvanced to DefaultItem.");
 			}
+			DefaultItem.gameObject.SetActive(true);
 			if (DefaultItem.GetComponentInChildren<Text>()==null)
 			{
 				throw new MissingComponentException("DefaultItem don't have child with 'Text' component. Add child with 'Text' component to DefaultItem.");
+			}
+
+			var topFillerObj = new GameObject("top filler");
+			topFillerObj.transform.SetParent(Container);
+			topFiller = topFillerObj.AddComponent<RectTransform>();
+			topFiller.SetAsFirstSibling();
+			topFiller.localScale = Vector3.one;
+			
+			var bottomFillerObj = new GameObject("bottom filler");
+			bottomFillerObj.transform.SetParent(Container);
+			bottomFiller = bottomFillerObj.AddComponent<RectTransform>();
+			bottomFiller.localScale = Vector3.one;
+
+			if (CanOptimize())
+			{
+				ScrollRect = scrollRect;
+				
+				scrollHeight = scrollRect.GetComponent<RectTransform>().rect.height;
+				itemHeight = DefaultItem.GetComponent<RectTransform>().rect.height;
+				maxVisibleItems = (int)Math.Ceiling(scrollHeight / itemHeight) + 1;
+				layout = Container.GetComponent<EasyLayout.EasyLayout>();
+
+				var r = scrollRect.gameObject.AddComponent<ResizeListener>();
+				r.OnResize.AddListener(Resize);
 			}
 
 			UpdateItems();
@@ -239,14 +358,36 @@ namespace UIWidgets
 			OnDeselect.AddListener(OnDeselectCallback);
 		}
 
+		void Resize()
+		{
+			scrollHeight = scrollRect.GetComponent<RectTransform>().rect.height;
+			maxVisibleItems = (int)Math.Ceiling(scrollHeight / itemHeight) + 1;
+			UpdateView();
+		}
+		
+		bool CanOptimize()
+		{
+			return scrollRect!=null && (layout!=null || Container.GetComponent<EasyLayout.EasyLayout>()!=null);
+		}
+
 		void OnSelectCallback(int index, ListViewItem item)
 		{
 			OnSelectString.Invoke(index, strings[index]);
+			
+			if (item!=null)
+			{
+				SelectColoring(item as ListViewStringComponent);
+			}
 		}
 
 		void OnDeselectCallback(int index, ListViewItem item)
 		{
 			OnDeselectString.Invoke(index, strings[index]);
+
+			if (item!=null)
+			{
+				DefaultColoring(item as ListViewStringComponent);
+			}
 		}
 
 		/// <summary>
@@ -325,7 +466,7 @@ namespace UIWidgets
 
 		void RemoveCallbacks()
 		{
-			itemsImages.ForEach((x, index) => {
+			components.ForEach((x, index) => {
 				if (x==null)
 				{
 					return ;
@@ -345,50 +486,120 @@ namespace UIWidgets
 
 		void AddCallbacks()
 		{
-			itemsImages.ForEach((image, index) => AddCallback(image, index));
+			components.ForEach(AddCallback);
 		}
 
-		void AddCallback(ImageAdvanced image, int index)
+		void AddCallback(ListViewStringComponent component, int index)
 		{
-			callbacksEnter.Add(ev => ImageOver(index));
-			callbacksExit.Add(ev => ImageOut(index));
+			callbacksEnter.Add(ev => OnPointerEnterCallback(component));
+			callbacksExit.Add(ev => OnPointerExitCallback(component));
 			
-			image.onPointerEnter.AddListener(callbacksEnter[index]);
-			image.onPointerExit.AddListener(callbacksExit[index]);
+			component.onPointerEnter.AddListener(callbacksEnter[index]);
+			component.onPointerExit.AddListener(callbacksExit[index]);
+		}
+
+		/// <summary>
+		/// Determines if item exists with the specified index.
+		/// </summary>
+		/// <returns><c>true</c> if item exists with the specified index; otherwise, <c>false</c>.</returns>
+		/// <param name="index">Index.</param>
+		public override bool IsValid(int index)
+		{
+			return (index >= 0) && (index < strings.Count);
+		}
+
+		void OnPointerEnterCallback(ListViewStringComponent component)
+		{
+			if (!IsValid(component.Index))
+			{
+				var message = string.Format("Index must be between 0 and Items.Count ({0})", strings.Count);
+				throw new IndexOutOfRangeException(message);
+			}
+
+			if (IsSelected(component.Index))
+			{
+				return ;
+			}
+
+			HighlightColoring(component);
+		}
+
+		void OnPointerExitCallback(ListViewStringComponent component)
+		{
+			if (!IsValid(component.Index))
+			{
+				var message = string.Format("Index must be between 0 and Items.Count ({0})", strings.Count);
+				throw new IndexOutOfRangeException(message);
+			}
+
+			if (IsSelected(component.Index))
+			{
+				return ;
+			}
+
+			DefaultColoring(component);
+		}
+
+		protected override void ScrollTo(int index)
+		{
+			if (!CanOptimize())
+			{
+				return ;
+			}
+			
+			var first_visible = GetFirstVisibleIndex(true);
+			var last_visible = GetLastVisibleIndex(true);
+			
+			if (first_visible > index)
+			{
+				var item_starts = index * (itemHeight + layout.Spacing.y);
+				var movement = 1 - scrollRect.verticalScrollbar.size - (item_starts / FullHeight());
+				var value_top = movement / (1 - scrollRect.verticalScrollbar.size);
+				
+				scrollRect.verticalScrollbar.value = value_top;
+			}
+			else if (last_visible < index)
+			{
+				var item_ends = (index + 1) * (itemHeight + layout.Spacing.y) - layout.Spacing.y + layout.Margin.y;
+				var movement = (FullHeight() - item_ends) / FullHeight();
+				var value_bottom = movement / (1 - scrollRect.verticalScrollbar.size);
+				
+				scrollRect.verticalScrollbar.value = value_bottom;
+			}
+		}
+
+		float FullHeight()
+		{
+			return layout.BlockSize[1];
 		}
 		
-		void ImageOver(int index)
+		float GetScrollMargin()
 		{
-			if (!IsValid(index))
-			{
-				var message = string.Format("Index must be between 0 and Items.Count ({0})", Items.Count);
-				throw new IndexOutOfRangeException(message);
-			}
-
-			if (IsSelected(index))
-			{
-				return ;
-			}
-
-			itemsImages[index].color = HighlightedBackgroundColor;
-			itemsText[index].color = HighlightedTextColor;
+			var value_n = (1f - scrollRect.verticalScrollbar.size) * (1f - scrollRect.verticalScrollbar.value);
+			return FullHeight() * value_n;
 		}
-
-		void ImageOut(int index)
+		
+		int GetLastVisibleIndex(bool strict=false)
 		{
-			if (!IsValid(index))
+			var window = GetScrollMargin() + scrollHeight;
+			var last_visible_index = (strict)
+				? (int)Math.Floor(window / (itemHeight + layout.Spacing.y))
+					: (int)Math.Ceiling(window / (itemHeight + layout.Spacing.y));
+			
+			return last_visible_index - 1;
+		}
+		
+		int GetFirstVisibleIndex(bool strict=false)
+		{
+			var first_visible_index = (strict)
+				? (int)Math.Ceiling(GetScrollMargin() / (itemHeight + layout.Spacing.y))
+					: (int)Math.Floor(GetScrollMargin() / (itemHeight + layout.Spacing.y));
+			if (strict)
 			{
-				var message = string.Format("Index must be between 0 and Items.Count ({0})", Items.Count);
-				throw new IndexOutOfRangeException(message);
+				return first_visible_index;
 			}
-
-			if (IsSelected(index))
-			{
-				return ;
-			}
-
-			itemsImages[index].color = backgroundColor;
-			itemsText[index].color = textColor;
+			
+			return Math.Min(first_visible_index, Math.Max(0, strings.Count - visibleItems));
 		}
 
 		List<string> FilterItems(IEnumerable<string> newItems)
@@ -423,34 +634,223 @@ namespace UIWidgets
 			return temp.ToList();
 		}
 
+		ListViewStringComponent ComponentTopToBottom()
+		{
+			var bottom = components.Count - 1;
+
+			var bottomComponent = components[bottom];
+			components.RemoveAt(bottom);
+			components.Insert(0, bottomComponent);
+			bottomComponent.transform.SetAsFirstSibling();
+
+			return bottomComponent;
+		}
+		
+		ListViewStringComponent ComponentBottomToTop()
+		{
+			var topComponent = components[0];
+			components.RemoveAt(0);
+			components.Add(topComponent);
+			topComponent.transform.SetAsLastSibling();
+
+			return topComponent;
+		}
+		
+		void OnScroll(float value)
+		{
+			var value_n = 1f - value;
+			var listHeight = (strings.Count * (itemHeight + layout.Spacing.y)) - layout.Spacing.y;
+			var window = (listHeight * value_n) - (scrollHeight * value_n);
+			var newTopHiddenItems = (int)Math.Floor((window + layout.Spacing.y) / (itemHeight + layout.Spacing.y));
+			
+			var oldTopHiddenItems = topHiddenItems;
+			topHiddenItems = Math.Min(newTopHiddenItems, strings.Count - visibleItems);
+			bottomHiddenItems = strings.Count - visibleItems - topHiddenItems;
+			
+			//поменять данные отображаемых элементов
+			if (oldTopHiddenItems==topHiddenItems)
+			{
+				//do nothing
+			}
+			// optimization on +-1 item scroll
+			else if (oldTopHiddenItems==(topHiddenItems + 1))
+			{
+				var bottomComponent = ComponentTopToBottom();
+
+				bottomComponent.Index = topHiddenItems;
+				bottomComponent.Text.text = strings[topHiddenItems];
+				Coloring(bottomComponent);
+			}
+			else if (oldTopHiddenItems==(topHiddenItems - 1))
+			{
+				var topComponent = ComponentBottomToTop();
+
+				var new_index = topHiddenItems + visibleItems - 1;
+				topComponent.Index = new_index;
+				topComponent.Text.text = strings[new_index];
+				Coloring(topComponent);
+			}
+			// all other cases
+			else
+			{
+				//!
+				var new_indicies = Enumerable.Range(topHiddenItems, visibleItems).ToArray();
+				components.ForEach((x, i) => {
+					x.Index = new_indicies[i];
+					x.Text.text = strings[new_indicies[i]];
+					Coloring(x);
+				});
+			}
+			
+			UpdateTopFiller();
+			UpdateBottomFiller();
+		}
+
+		List<ListViewStringComponent> componentsCache = new List<ListViewStringComponent>();
+		List<ListViewStringComponent> GetNewComponents()
+		{
+			componentsCache = componentsCache.Where(x => x != null).ToList();
+			var new_components = new List<ListViewStringComponent>();
+			strings.ForEach ((x, i) =>  {
+				if (i >= visibleItems)
+				{
+					return;
+				}
+				
+				if (components.Count > 0)
+				{
+					new_components.Add(components[0]);
+					components.RemoveAt(0);
+				}
+				else if (componentsCache.Count > 0)
+				{
+					componentsCache[0].gameObject.SetActive(true);
+					new_components.Add(componentsCache[0]);
+					componentsCache.RemoveAt(0);
+				}
+				else
+				{
+					#if (UNITY_4_6 || UNITY_4_7)
+					var background = Instantiate(DefaultItem) as ImageAdvanced;
+					#else
+					var background = Instantiate(DefaultItem);
+					#endif
+
+					background.gameObject.SetActive(true);
+					
+					var component = background.GetComponent<ListViewStringComponent>();
+					if (component==null)
+					{
+						component = background.gameObject.AddComponent<ListViewStringComponent>();
+						component.Background = background;
+						component.Text = background.GetComponentInChildren<Text>();
+					}
+
+					Utilites.FixInstantiated(DefaultItem, background);
+					component.gameObject.SetActive(true);
+
+					new_components.Add(component);
+				}
+			});
+			
+			components.ForEach(x => x.gameObject.SetActive(false));
+			componentsCache.AddRange(components);
+			components.Clear();
+			
+			return new_components;
+		}
+
+		void UpdateView()
+		{
+			RemoveCallbacks();
+			
+			if (CanOptimize())
+			{
+				visibleItems = (maxVisibleItems < strings.Count) ? maxVisibleItems : strings.Count;
+			}
+			else
+			{
+				visibleItems = strings.Count;
+			}
+
+			components = GetNewComponents();
+
+			var base_items = new List<ListViewItem>();
+			components.ForEach(x => base_items.Add(x));
+			base.Items = base_items;
+			
+			components.ForEach((x, i) => {
+				x.Index = i;
+				x.Text.text = strings[i];
+				Coloring(x);
+			});
+			
+			AddCallbacks();
+			
+			topHiddenItems = 0;
+			bottomHiddenItems = strings.Count() - visibleItems;
+			
+			UpdateTopFiller();
+			UpdateBottomFiller();
+			if (layout)
+			{
+				//force rebuild
+				layout.SetLayoutVertical();
+			}
+
+			if (scrollRect!=null)
+			{
+				var r = scrollRect.GetComponent<RectTransform>();
+				r.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, r.rect.width);
+			}
+		}
+
 		void UpdateItems(List<string> newItems)
 		{
 			newItems = FilterItems(newItems);
 
-			RemoveCallbacks();
-
-			CreateItems(newItems.Count);
-
-			var selected_indicies = UpdateTextes(newItems);
-
-			UpdateColors(selected_indicies);
+			var new_selected_indicies = NewSelectedIndicies(newItems);
+			SelectedIndicies.ForEach(x => {
+				if (!new_selected_indicies.Contains(x))
+				{
+					Deselect(x);
+				}
+			});
 
 			strings = newItems;
 
-			var base_items = new List<ListViewItem>();
-			itemsImages.ForEach(x => {
-				var item = x.GetComponent<ListViewItem>() ?? x.gameObject.AddComponent<ListViewItem>();
-				base_items.Add(item);
-			});
-
-			base.Items = base_items;
-
-			selected_indicies.ForEach(x => Select(x));
-
-			AddCallbacks();
+			UpdateView();
 		}
 
-		List<int> UpdateTextes(IList<string> newItems)
+		void UpdateBottomFiller()
+		{
+			bottomFiller.SetAsLastSibling();
+			if (bottomHiddenItems==0)
+			{
+				bottomFiller.gameObject.SetActive(false);
+			}
+			else
+			{
+				bottomFiller.gameObject.SetActive(true);
+				bottomFiller.sizeDelta = new Vector2(bottomFiller.sizeDelta.x, bottomHiddenItems * (itemHeight + layout.Spacing.y) - layout.Spacing.y);
+			}
+		}
+		
+		void UpdateTopFiller()
+		{
+			topFiller.SetAsFirstSibling();
+			if (topHiddenItems==0)
+			{
+				topFiller.gameObject.SetActive(false);
+			}
+			else
+			{
+				topFiller.gameObject.SetActive(true);
+				topFiller.sizeDelta = new Vector2(bottomFiller.sizeDelta.x, topHiddenItems * (itemHeight + layout.Spacing.y) - layout.Spacing.y);
+			}
+		}
+
+		List<int> NewSelectedIndicies(IList<string> newItems)
 		{
 			//duplicated items should not be selected more than at start
 			var new_items_copy = new List<string>(newItems);
@@ -471,14 +871,11 @@ namespace UIWidgets
 			var selected_items_copy = new List<string>(selected_items);
 
 			int index = 0;
-			itemsImages.ForEach(image => {
+			components.ForEach(component => {
 				var is_selected = selected_items_copy.Contains(newItems[index]);
 
 				selected_items_copy.Remove(newItems[index]);
 
-				var text = itemsText[index];
-				text.text = newItems[index];
-				
 				if (is_selected)
 				{
 					selected_indicies.Add(index);
@@ -490,83 +887,145 @@ namespace UIWidgets
 			return selected_indicies;
 		}
 
-		ImageAdvanced CreateImage()
+		/// <summary>
+		/// Coloring the specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected override void Coloring(ListViewItem component)
 		{
-			var image = Instantiate(DefaultItem) as ImageAdvanced;
-
-			image.gameObject.SetActive(true);
-			image.color = backgroundColor;
-
-			Utilites.FixInstantiated(DefaultItem, image);
-
-			itemsImages.Add(image);
-
-			var text = image.GetComponentInChildren<Text>();
-			text.color = textColor;
-			itemsText.Add(text);
-
-			return image;
-		}
-		
-		void CreateItems(int newItemsCount)
-		{
-			//add new ui elements if necessary
-			if (newItemsCount > itemsText.Count)
+			if (component==null)
 			{
-				for (var i = itemsText.Count; i < newItemsCount; i++)//each (var i in Enumerable.Range(itemsText.Count, newItemsCount - itemsText.Count))
-				{
-					CreateImage();
-				}
+				return ;
 			}
-			//del existing ui elements if necessary
-
-			if (newItemsCount < itemsText.Count)
+			if (SelectedIndicies.Contains(component.Index))
 			{
-				for (var i = itemsText.Count - 1; i >= newItemsCount; i--)//each (var i in Enumerable.Range(newItemsCount, itemsText.Count - newItemsCount).Reverse())
-				{
-					Destroy(itemsImages[i].gameObject);
-
-					itemsImages.RemoveAt(i);
-					itemsText.RemoveAt(i);
-				}
+				SelectColoring(component);
 			}
-
-		}
-
-		void UpdateColors(ICollection<int> selectedIndicies)
-		{
-			itemsImages.ForEach((image, index) => {
-				var text = itemsText[index];
-				if (selectedIndicies.Contains(index))
-				{
-					image.color = selectedBackgroundColor;
-					text.color = selectedTextColor;
-				}
-				else
-				{
-					image.color = backgroundColor;
-					text.color = textColor;
-				}
-			});
+			else
+			{
+				DefaultColoring(component);
+			}
 		}
 
 		void UpdateColors()
 		{
-			UpdateColors(SelectedIndicies);
+			components.ForEach(Coloring);
 		}
 
+		ListViewStringComponent GetComponent(int index)
+		{
+			return components.Find(x => x.Index==index);
+		}
+
+		/// <summary>
+		/// Called when item selected.
+		/// Use it for change visible style of selected item.
+		/// </summary>
+		/// <param name="index">Index.</param>
 		protected override void SelectItem(int index)
 		{
-			itemsImages[index].color = selectedBackgroundColor;
-			itemsText[index].color = selectedTextColor;
-		}
-		
-		protected override void DeselectItem(int index)
-		{
-			itemsImages[index].color = backgroundColor;
-			itemsText[index].color = textColor;
+			SelectColoring(GetComponent(index));
 		}
 
+		/// <summary>
+		/// Called when item deselected.
+		/// Use it for change visible style of deselected item.
+		/// </summary>
+		/// <param name="index">Index.</param>
+		protected override void DeselectItem(int index)
+		{
+			DefaultColoring(GetComponent(index));
+		}
+
+		/// <summary>
+		/// Set highlights colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected override void HighlightColoring(ListViewItem component)
+		{
+			if (IsSelected(component.Index))
+			{
+				return ;
+			}
+			HighlightColoring(component as ListViewStringComponent);
+		}
+
+		/// <summary>
+		/// Set highlights colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void HighlightColoring(ListViewStringComponent component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+
+			component.Background.color = HighlightedBackgroundColor;
+			component.Text.color = HighlightedTextColor;
+		}
+
+		/// <summary>
+		/// Set select colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void SelectColoring(ListViewItem component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+			
+			SelectColoring(component as ListViewStringComponent);
+		}
+
+		/// <summary>
+		/// Set select colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void SelectColoring(ListViewStringComponent component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+
+			component.Background.color = selectedBackgroundColor;
+			component.Text.color = selectedTextColor;
+		}
+
+		/// <summary>
+		/// Set default colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void DefaultColoring(ListViewItem component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+			
+			DefaultColoring(component as ListViewStringComponent);
+		}
+
+		/// <summary>
+		/// Set default colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void DefaultColoring(ListViewStringComponent component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+
+			component.Background.color = backgroundColor;
+			component.Text.color = textColor;
+		}
+
+		/// <summary>
+		/// This function is called when the MonoBehaviour will be destroyed.
+		/// </summary>
 		protected override void OnDestroy()
 		{
 			OnSelect.RemoveListener(OnSelectCallback);

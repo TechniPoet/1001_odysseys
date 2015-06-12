@@ -21,7 +21,7 @@ namespace UIWidgets
 		/// <param name="parent">Parent.</param>
 		static public GameObject CreateObject(string path, Transform parent=null)
 		{
-			var prefab = Resources.LoadAssetAtPath<GameObject>(path);
+			var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
 			if (prefab==null)
 			{
 				throw new ArgumentException(string.Format("Prefab not found at path {0}.", path));
@@ -78,8 +78,6 @@ namespace UIWidgets
 			rectTransform.localPosition = defaultRectTransform.localPosition;
 			rectTransform.position = defaultRectTransform.position;
 			rectTransform.rotation = defaultRectTransform.rotation;
-			//Debug.Log(defaultRectTransform.localScale);
-			//Debug.Log(rectTransform.localScale);
 			rectTransform.localScale = defaultRectTransform.localScale;
 			rectTransform.anchoredPosition = defaultRectTransform.anchoredPosition;
 		}

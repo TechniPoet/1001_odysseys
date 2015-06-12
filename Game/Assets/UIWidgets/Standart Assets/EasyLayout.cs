@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using System.Linq;
 using System;
@@ -175,7 +177,7 @@ namespace EasyLayout {
 		{
 			get
 			{
-				return UISize[1];
+				return BlockSize[1];
 			}
 		}
 
@@ -187,7 +189,7 @@ namespace EasyLayout {
 		{
 			get
 			{
-				return UISize[0];
+				return BlockSize[0];
 			}
 		}
 
@@ -199,7 +201,7 @@ namespace EasyLayout {
 		{
 			get
 			{
-				return UISize[1];
+				return BlockSize[1];
 			}
 		}
 
@@ -211,7 +213,7 @@ namespace EasyLayout {
 		{
 			get
 			{
-				return UISize[0];
+				return BlockSize[0];
 			}
 		}
 
@@ -351,6 +353,7 @@ namespace EasyLayout {
 				return ;
 			}
 			rebuild = false;
+
 			UpdateLayout();
 		}
 
@@ -522,11 +525,18 @@ namespace EasyLayout {
 			{
 				children = children.Where(x => x.activeSelf).ToList();
 			}
-			
+
+			#if (UNITY_4_6 || UNITY_4_7)
 			var ui_elements = Filter(children).Where(x => {
-				var ignorer = x.GetComponent(typeof(ILayoutIgnorer)) as ILayoutIgnorer;
+				var ignorer = x.GetComponent(typeof(ILayoutIgnorer)) as ILayoutIgnorer;//
 				return (ignorer==null) || !ignorer.ignoreLayout;
 			}).Select(x => x.GetComponent<RectTransform>()).Where(x => x!=null).ToList();
+			#else
+			var ui_elements = Filter(children).Where(x => {
+				var ignorer = x.GetComponent<ILayoutIgnorer>();
+				return (ignorer==null) || !ignorer.ignoreLayout;
+			}).Select(x => x.GetComponent<RectTransform>()).Where(x => x!=null).ToList();
+			#endif
 
 			return ui_elements;
 		}

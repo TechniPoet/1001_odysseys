@@ -5,6 +5,7 @@ labels:
 - Notification
 - Achievement
 - Uiwidgets
+- Widget
 MonoImporter:
   serializedVersion: 2
   defaultReferences: []

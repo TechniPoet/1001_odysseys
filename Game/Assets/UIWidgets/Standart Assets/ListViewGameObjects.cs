@@ -65,18 +65,24 @@ namespace UIWidgets
 		/// </summary>
 		public ListViewGameObjectsEvent OnPointerExitObject = new ListViewGameObjectsEvent();
 
-		bool start_called = false;
+		void Awake()
+		{
+			Start();
+		}
+		
+		[System.NonSerialized]
+		bool isStartedListViewGameObjects = false;
 
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public override void Start()
 		{
-			if (start_called)
+			if (isStartedListViewGameObjects)
 			{
 				return ;
 			}
-			start_called = true;
+			isStartedListViewGameObjects = true;
 			
 			base.Start();
 			
@@ -226,7 +232,9 @@ namespace UIWidgets
 			AddCallbacks();
 		}
 		
-
+		/// <summary>
+		/// This function is called when the MonoBehaviour will be destroyed.
+		/// </summary>
 		protected override void OnDestroy()
 		{
 			OnSelect.RemoveListener(OnSelectCallback);

@@ -33,6 +33,10 @@ namespace UIWidgets
 			}
 			set {
 				UpdateItems(value);
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.value = 1f;
+				}
 			}
 		}
 
@@ -124,7 +128,6 @@ namespace UIWidgets
 		/// <summary>
 		/// What to do when the event system send a pointer enter Event.
 		/// </summary>
-
 		public ListViewCustomEvent OnPointerEnterObject = new ListViewCustomEvent();
 		
 		/// <summary>
@@ -132,8 +135,6 @@ namespace UIWidgets
 		/// </summary>
 		public ListViewCustomEvent OnPointerExitObject = new ListViewCustomEvent();
 		
-		bool start_called = false;
-
 		[SerializeField]
 		Color defaultBackgroundColor = Color.white;
 		
@@ -210,16 +211,90 @@ namespace UIWidgets
 			}
 		}
 
+		[SerializeField]
+		ScrollRect scrollRect;
+
+		/// <summary>
+		/// Gets or sets the ScrollRect.
+		/// </summary>
+		/// <value>The ScrollRect.</value>
+		public ScrollRect ScrollRect {
+			get {
+				return scrollRect;
+			}
+			set {
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.onValueChanged.RemoveListener(OnScroll);
+				}
+				scrollRect = value;
+				if (scrollRect!=null)
+				{
+					scrollRect.verticalScrollbar.onValueChanged.AddListener(OnScroll);
+				}
+			}
+		}
+
+		/// <summary>
+		/// The top filler.
+		/// </summary>
+		RectTransform topFiller;
+
+		/// <summary>
+		/// The bottom filler.
+		/// </summary>
+		RectTransform bottomFiller;
+
+		/// <summary>
+		/// The height of the DefaultItem.
+		/// </summary>
+		float itemHeight;
+
+		/// <summary>
+		/// The height of the ScrollRect.
+		/// </summary>
+		float scrollHeight;
+
+		/// <summary>
+		/// Count of visible items.
+		/// </summary>
+		int maxVisibleItems;
+
+		/// <summary>
+		/// Count of visible items.
+		/// </summary>
+		int visibleItems;
+
+		/// <summary>
+		/// Count of hidden items by top filler.
+		/// </summary>
+		int topHiddenItems;
+
+		/// <summary>
+		/// Count of hidden items by bottom filler.
+		/// </summary>
+		int bottomHiddenItems;
+
+		void Awake()
+		{
+			Start();
+		}
+
+		[System.NonSerialized]
+		bool isStartedListViewCustom = false;
+
+		EasyLayout.EasyLayout layout;
+
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public override void Start()
 		{
-			if (start_called)
+			if (isStartedListViewCustom)
 			{
 				return ;
 			}
-			start_called = true;
+			isStartedListViewCustom = true;
 			
 			base.Start();
 
@@ -229,46 +304,90 @@ namespace UIWidgets
 			{
 				throw new NullReferenceException(String.Format("DefaultItem is null. Set component of type {0} to DefaultItem.", typeof(TComponent).FullName));
 			}
+			DefaultItem.gameObject.SetActive(true);
 
-			UpdateItems();
-			
+			var topFillerObj = new GameObject("top filler");
+			topFillerObj.transform.SetParent(Container);
+			topFiller = topFillerObj.AddComponent<RectTransform>();
+			topFiller.SetAsFirstSibling();
+			topFiller.localScale = Vector3.one;
+
+			var bottomFillerObj = new GameObject("bottom filler");
+			bottomFillerObj.transform.SetParent(Container);
+			bottomFiller = bottomFillerObj.AddComponent<RectTransform>();
+			bottomFiller.localScale = Vector3.one;
+
+			if (CanOptimize())
+			{
+				ScrollRect = scrollRect;
+
+				scrollHeight = scrollRect.GetComponent<RectTransform>().rect.height;
+				itemHeight = DefaultItem.GetComponent<RectTransform>().rect.height;
+				maxVisibleItems = (int)Math.Ceiling(scrollHeight / itemHeight) + 1;
+				layout = Container.GetComponent<EasyLayout.EasyLayout>();
+
+				var r = scrollRect.gameObject.AddComponent<ResizeListener>();
+				r.OnResize.AddListener(Resize);
+			}
+
+			customItems = SortItems(customItems);
+			UpdateView();
+
 			DefaultItem.gameObject.SetActive(false);
 
 			OnSelect.AddListener(OnSelectCallback);
 			OnDeselect.AddListener(OnDeselectCallback);
 		}
-		
+
+		void Resize()
+		{
+			scrollHeight = scrollRect.GetComponent<RectTransform>().rect.height;
+			maxVisibleItems = (int)Math.Ceiling(scrollHeight / itemHeight) + 1;
+			UpdateView();
+		}
+
+		bool CanOptimize()
+		{
+			return scrollRect!=null && (layout!=null || Container.GetComponent<EasyLayout.EasyLayout>()!=null);
+		}
+
 		void OnSelectCallback(int index, ListViewItem item)
 		{
 			OnSelectObject.Invoke(index);
 
-			SelectColoring(components[index]);
+			if (item!=null)
+			{
+				SelectColoring(item);
+			}
 		}
 		
 		void OnDeselectCallback(int index, ListViewItem item)
 		{
 			OnDeselectObject.Invoke(index);
 
-			DefaultColoring(components[index]);
-		}
-		
-		void OnPointerEnterCallback(int index)
-		{
-			OnPointerEnterObject.Invoke(index);
-
-			if (!IsSelected(index))
+			if (item!=null)
 			{
-				HighlightColoring(components[index]);
+				DefaultColoring(item);
 			}
 		}
 		
-		void OnPointerExitCallback(int index)
+		void OnPointerEnterCallback(ListViewItem item)
 		{
-			OnPointerExitObject.Invoke(index);
+			OnPointerEnterObject.Invoke(item.Index);
 
-			if (!IsSelected(index))
+			if (!IsSelected(item.Index))
 			{
-				DefaultColoring(components[index]);
+				HighlightColoring(item);
+			}
+		}
+		
+		void OnPointerExitCallback(ListViewItem item)
+		{
+			OnPointerExitObject.Invoke(item.Index);
+
+			if (!IsSelected(item.Index))
+			{
+				DefaultColoring(item);
 			}
 		}
 		
@@ -296,11 +415,15 @@ namespace UIWidgets
 		/// <returns>Index of added item.</returns>
 		public virtual int Add(TItem item)
 		{
+			if (item==null)
+			{
+				throw new ArgumentNullException("Item is null.");
+			}
 			var newItems = customItems;
 			newItems.Add(item);
 			UpdateItems(newItems);
-			
-			var index = customItems.FindIndex(x => x.Equals(item));
+
+			var index = customItems.FindIndex(x => System.Object.ReferenceEquals(x, item));
 			
 			return index;
 		}
@@ -312,7 +435,12 @@ namespace UIWidgets
 		/// <returns>Index of removed TItem.</returns>
 		public virtual int Remove(TItem item)
 		{
-			var index = customItems.FindIndex(x => x.Equals(item));
+			if (item==null)
+			{
+				throw new ArgumentNullException("Item is null.");
+			}
+
+			var index = customItems.FindIndex(x => System.Object.ReferenceEquals(x, item));
 			if (index==-1)
 			{
 				return index;
@@ -334,39 +462,70 @@ namespace UIWidgets
 			newItems.RemoveAt(index);
 			UpdateItems(newItems);			
 		}
-		
+
+		void RemoveCallback(ListViewItem item, int index)
+		{
+			if (item==null)
+			{
+				return ;
+			}
+			if (callbacksEnter.Count > index)
+			{
+				item.onPointerEnter.RemoveListener(callbacksEnter[index]);
+			}
+			if (callbacksExit.Count > index)
+			{
+				item.onPointerExit.RemoveListener(callbacksExit[index]);
+			}
+		}
+
+		protected override void ScrollTo(int index)
+		{
+			if (!CanOptimize())
+			{
+				return ;
+			}
+
+			var first_visible = GetFirstVisibleIndex(true);
+			var last_visible = GetLastVisibleIndex(true);
+
+			if (first_visible > index)
+			{
+				var item_starts = index * (itemHeight + layout.Spacing.y);
+				var movement = 1 - scrollRect.verticalScrollbar.size - (item_starts / FullHeight());
+				var value_top = movement / (1 - scrollRect.verticalScrollbar.size);
+
+				scrollRect.verticalScrollbar.value = value_top;
+			}
+			else if (last_visible < index)
+			{
+				var item_ends = (index + 1) * (itemHeight + layout.Spacing.y) - layout.Spacing.y + layout.Margin.y;
+				var movement = (FullHeight() - item_ends) / FullHeight();
+				var value_bottom = movement / (1 - scrollRect.verticalScrollbar.size);
+
+				scrollRect.verticalScrollbar.value = value_bottom;
+			}
+		}
+
 		void RemoveCallbacks()
 		{
-			base.Items.ForEach((item, index) => {
-				if (item==null)
-				{
-					return ;
-				}
-				if (callbacksEnter.Count > index)
-				{
-					item.onPointerEnter.RemoveListener(callbacksEnter[index]);
-				}
-				if (callbacksExit.Count > index)
-				{
-					item.onPointerExit.RemoveListener(callbacksExit[index]);
-				}
-			});
+			base.Items.ForEach(RemoveCallback);
 			callbacksEnter.Clear();
 			callbacksExit.Clear();
 		}
 		
 		void AddCallbacks()
 		{
-			base.Items.ForEach((item, index) => AddCallback(item, index));
+			base.Items.ForEach(AddCallback);
 		}
 		
 		void AddCallback(ListViewItem item, int index)
 		{
-			callbacksEnter.Add(ev => OnPointerEnterCallback(index));
-			callbacksExit.Add(ev => OnPointerExitCallback(index));
+			callbacksEnter.Add(ev => OnPointerEnterCallback(item));
+			callbacksExit.Add(ev => OnPointerExitCallback(item));
 			
-			item.onPointerEnter.AddListener(callbacksEnter[index]);
-			item.onPointerExit.AddListener(callbacksExit[index]);
+			item.onPointerEnter.AddListener(callbacksEnter[callbacksEnter.Count - 1]);
+			item.onPointerExit.AddListener(callbacksExit[callbacksExit.Count - 1]);
 		}
 		
 		List<TItem> SortItems(List<TItem> newItems)
@@ -389,19 +548,16 @@ namespace UIWidgets
 		{
 		}
 
-		void Items2Components(List<TItem> newItems)
+		List<TComponent> GetNewComponents()
 		{
-		}
-
-		void UpdateItems(List<TItem> newItems)
-		{
-			RemoveCallbacks();
-
-			newItems = SortItems(newItems);
-			
-			componentsCache = componentsCache.Where(x => x!=null).ToList();
+			componentsCache = componentsCache.Where (x => x != null).ToList ();
 			var new_components = new List<TComponent>();
-			newItems.ForEach((x, i) => {
+			customItems.ForEach ((x, i) =>  {
+				if (i >= visibleItems)
+				{
+					return;
+				}
+
 				if (components.Count > 0)
 				{
 					new_components.Add(components[0]);
@@ -416,61 +572,234 @@ namespace UIWidgets
 				else
 				{
 					var component = Instantiate(DefaultItem) as TComponent;
-					
-					Utilites.FixInstantiated(DefaultItem, component);
-					
+					Utilites.FixInstantiated (DefaultItem, component);
 					component.gameObject.SetActive(true);
-					
 					new_components.Add(component);
 				}
 			});
+
 			components.ForEach(x => x.gameObject.SetActive(false));
 			componentsCache.AddRange(components);
 			components.Clear();
-			
 
-			var selected_indicies = new List<int>();
+			return new_components;
+		}
+
+		float FullHeight()
+		{
+			return layout.BlockSize[1];
+		}
+
+		float GetScrollMargin()
+		{
+			var value_n = (1f - scrollRect.verticalScrollbar.size) * (1f - scrollRect.verticalScrollbar.value);
+			return FullHeight() * value_n;
+		}
+
+		int GetLastVisibleIndex(bool strict=false)
+		{
+			var window = GetScrollMargin() + scrollHeight;
+			var last_visible_index = (strict)
+				? (int)Math.Floor(window / (itemHeight + layout.Spacing.y))
+				: (int)Math.Ceiling(window / (itemHeight + layout.Spacing.y));
+			
+			return last_visible_index - 1;
+		}
+
+		int GetFirstVisibleIndex(bool strict=false)
+		{
+			var first_visible_index = (strict)
+				? (int)Math.Ceiling(GetScrollMargin() / (itemHeight + layout.Spacing.y))
+				: (int)Math.Floor(GetScrollMargin() / (itemHeight + layout.Spacing.y));
+			if (strict)
+			{
+				return first_visible_index;
+			}
+
+			return Math.Min(first_visible_index, Math.Max(0, customItems.Count - visibleItems));
+		}
+		
+		void OnScroll(float value)
+		{
+			var oldTopHiddenItems = topHiddenItems;
+
+			topHiddenItems = GetFirstVisibleIndex();
+			bottomHiddenItems = Math.Max(0, customItems.Count - visibleItems - topHiddenItems);
+
+			//поменять данные отображаемых элементов
+			if (oldTopHiddenItems==topHiddenItems)
+			{
+				//do nothing
+			}
+			// optimization on +-1 item scroll
+			else if (oldTopHiddenItems==(topHiddenItems + 1))
+			{
+				var bottomComponent = components[components.Count - 1];
+				components.RemoveAt(components.Count - 1);
+				components.Insert(0, bottomComponent);
+				bottomComponent.transform.SetAsFirstSibling();
+
+				bottomComponent.Index = topHiddenItems;
+				SetData(bottomComponent, customItems[topHiddenItems]);
+				Coloring(bottomComponent as ListViewItem);
+			}
+			else if (oldTopHiddenItems==(topHiddenItems - 1))
+			{
+				var topComponent = components[0];
+				components.RemoveAt(0);
+				components.Add(topComponent);
+				topComponent.transform.SetAsLastSibling();
+
+				topComponent.Index = topHiddenItems + visibleItems - 1;
+				SetData(topComponent, customItems[topHiddenItems + visibleItems - 1]);
+				Coloring(topComponent as ListViewItem);
+			}
+			// all other cases
+			else
+			{
+				var new_indicies = Enumerable.Range(topHiddenItems, visibleItems).ToArray();
+				components.ForEach((x, i) => {
+					x.Index = new_indicies[i];
+					SetData(x, customItems[new_indicies[i]]);
+					Coloring(x as ListViewItem);
+				});
+			}
+
+			SetTopFiller();
+			SetBottomFiller();
+		}
+
+		void UpdateView()
+		{
+			RemoveCallbacks();
+
+			if (CanOptimize())
+			{
+				visibleItems = (maxVisibleItems < customItems.Count) ? maxVisibleItems : customItems.Count;
+			}
+			else
+			{
+				visibleItems = customItems.Count;
+			}
+
+			components = GetNewComponents();
+
+			var base_items = new List<ListViewItem>();
+			components.ForEach(x => base_items.Add(x));
+			
+			base.Items = base_items;
+			
+			components.ForEach((x, i) => {
+				x.Index = i;
+				SetData(x, customItems[i]);
+				Coloring(x as ListViewItem);
+			});
+
+			AddCallbacks();
+			
+			topHiddenItems = 0;
+			bottomHiddenItems = customItems.Count() - visibleItems;
+			
+			SetTopFiller();
+			SetBottomFiller();
+			if (layout)
+			{
+				//force rebuild
+				layout.SetLayoutVertical();
+			}
+
+			#if UNITY_4_6_1
+			// force ContentSizeFitter update text width
+			scrollRect.verticalScrollbar.value += 0.1f;
+			#endif
+		}
+
+		void UpdateItems(List<TItem> newItems)
+		{
+			newItems = SortItems(newItems);
+
 			SelectedIndicies.ForEach(index => {
 				var new_index = newItems.FindIndex(x => x.Equals(customItems[index]));
-				if (new_index!=-1)
+				if (new_index==-1)
 				{
-					selected_indicies.Add(index);
+					Deselect(index);
 				}
 			});
 
 			customItems = newItems;
-			components = new_components;
 
-			var base_items = new List<ListViewItem>();
-			components.ForEach(x => {
-				//var item = x.GetComponent<ListViewItem>() ?? x.gameObject.AddComponent<ListViewItem>();
-				base_items.Add(x);
-			});
-
-			base.Items= base_items;
-
-			new_components.ForEach((x, i) => {
-				SetData(x, newItems[i]);
-				DefaultColoring(x);
-			});
-
-			selected_indicies.ForEach(x => Select(x));
-			
-			AddCallbacks();
+			UpdateView();
 		}
 
-		void UpdateColors(ICollection<int> selectedIndicies)
+		void SetBottomFiller()
 		{
-			components.ForEach((component, index) => {
-				if (selectedIndicies.Contains(index))
-				{
-					SelectColoring(component);
-				}
-				else
-				{
-					DefaultColoring(component);
-				}
-			});
+			bottomFiller.SetAsLastSibling();
+			if (bottomHiddenItems==0)
+			{
+				bottomFiller.gameObject.SetActive(false);
+			}
+			else
+			{
+				bottomFiller.gameObject.SetActive(true);
+				bottomFiller.sizeDelta = new Vector2(bottomFiller.sizeDelta.x, bottomHiddenItems * (itemHeight + layout.Spacing.y) - layout.Spacing.y);
+			}
+		}
+
+		void SetTopFiller()
+		{
+			topFiller.SetAsFirstSibling();
+			if (topHiddenItems==0)
+			{
+				topFiller.gameObject.SetActive(false);
+			}
+			else
+			{
+				topFiller.gameObject.SetActive(true);
+				topFiller.sizeDelta = new Vector2(bottomFiller.sizeDelta.x, topHiddenItems * (itemHeight + layout.Spacing.y) - layout.Spacing.y);
+			}
+		}
+
+		/// <summary>
+		/// Determines if item exists with the specified index.
+		/// </summary>
+		/// <returns><c>true</c> if item exists with the specified index; otherwise, <c>false</c>.</returns>
+		/// <param name="index">Index.</param>
+		public override bool IsValid(int index)
+		{
+			return (index >= 0) && (index < customItems.Count);
+		}
+
+		/// <summary>
+		/// Coloring the specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected override void Coloring(ListViewItem component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+			if (SelectedIndicies.Contains(component.Index))
+			{
+				SelectColoring(component);
+			}
+			else
+			{
+				DefaultColoring(component);
+			}
+		}
+
+		/// <summary>
+		/// Set highlights colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected override void HighlightColoring(ListViewItem component)
+		{
+			if (IsSelected(component.Index))
+			{
+				return ;
+			}
+			HighlightColoring(component as TComponent);
 		}
 
 		/// <summary>
@@ -486,9 +815,37 @@ namespace UIWidgets
 		/// Set select colors of specified component.
 		/// </summary>
 		/// <param name="component">Component.</param>
+		protected virtual void SelectColoring(ListViewItem component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+
+			SelectColoring(component as TComponent);
+		}
+
+		/// <summary>
+		/// Set select colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
 		protected virtual void SelectColoring(TComponent component)
 		{
 			component.Background.color = SelectedBackgroundColor;
+		}
+
+		/// <summary>
+		/// Set default colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void DefaultColoring(ListViewItem component)
+		{
+			if (component==null)
+			{
+				return ;
+			}
+
+			DefaultColoring(component as TComponent);
 		}
 
 		/// <summary>
@@ -500,10 +857,9 @@ namespace UIWidgets
 			component.Background.color = DefaultBackgroundColor;
 		}
 
-
 		void UpdateColors()
 		{
-			UpdateColors(SelectedIndicies);
+			components.ForEach(x => Coloring(x as ListViewItem));
 		}
 
 		/// <summary>

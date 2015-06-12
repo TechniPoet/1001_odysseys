@@ -33,6 +33,7 @@ namespace UIWidgets
 
 			"Container",
 			"DefaultItem",
+			"scrollRect",
 		};
 		
 		protected virtual void OnEnable()
@@ -77,6 +78,7 @@ namespace UIWidgets
 
 			EditorGUILayout.PropertyField(serializedProperties["DefaultItem"]);
 			EditorGUILayout.PropertyField(serializedProperties["Container"]);
+			EditorGUILayout.PropertyField(serializedProperties["scrollRect"]);
 
 			serializedObject.ApplyModifiedProperties();
 			

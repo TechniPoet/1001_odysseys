@@ -9,16 +9,16 @@ public class WorldAskerScreen : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		gm = GameMaster.Instance();
-		worldCombo.ListView.Remove("Item 1");
-		worldCombo.ListView.Remove("Item 2");
-		worldCombo.ListView.Remove("Item 3");
-		worldCombo.ListView.Remove("Item 4");
-		worldCombo.ListView.Remove("Item 5");
+		worldCombo.Start();
+		foreach (string s in worldCombo.ListView.Strings) {
+			worldCombo.ListView.Remove(s);
+		}
+		//worldCombo.Clear();
 		foreach(string planet in gm.planetList)
 		{
 			worldCombo.ListView.Add(planet);
 		}
-		worldCombo.ListView.Select(0);
+		//worldCombo.ListView.Select(0);
 	}
 	
 	// Update is called once per frame

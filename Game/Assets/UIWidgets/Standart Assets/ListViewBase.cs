@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -16,14 +16,22 @@ namespace UIWidgets
 	}
 
 	/// <summary>
+	/// ListViewFocus event.
+	/// </summary>
+	public class ListViewFocusEvent : UnityEvent<BaseEventData>
+	{
+
+	}
+
+	/// <summary>
 	/// ListViewBase.
 	/// You can use it for creating custom ListViews.
 	/// </summary>
-	abstract public class ListViewBase : MonoBehaviour, ISelectHandler, IDeselectHandler {
+	abstract public class ListViewBase : MonoBehaviour, ISelectHandler, IDeselectHandler, ISubmitHandler, ICancelHandler {
 		[SerializeField]
 		[HideInInspector]
 		List<ListViewItem> items = new List<ListViewItem>();
-		List<UnityAction<PointerEventData>> callbacks = new List<UnityAction<PointerEventData>>();
+		List<UnityAction> callbacks = new List<UnityAction>();
 
 		/// <summary>
 		/// Gets or sets the items.
@@ -91,8 +99,8 @@ namespace UIWidgets
 				return new List<int>(selectedIndicies);
 			}
 			set {
-				var deselect = selectedIndicies.Where(index => !value.Contains(index));
-				var select = value.Where(index => !selectedIndicies.Contains(index));
+				var deselect = selectedIndicies.Where(index => !value.Contains(index)).ToList();
+				var select = value.Where(index => !selectedIndicies.Contains(index)).ToList();
 
 				deselect.ForEach(index => Deselect(index));
 				select.ForEach(index => Select(index));
@@ -110,21 +118,74 @@ namespace UIWidgets
 		public ListViewBaseEvent OnDeselect = new ListViewBaseEvent();
 
 		/// <summary>
+		/// OnSubmit event.
+		/// </summary>
+		public UnityEvent onSubmit = new UnityEvent();
+
+		/// <summary>
+		/// OnCancel event.
+		/// </summary>
+		public UnityEvent onCancel = new UnityEvent();
+
+		/// <summary>
+		/// OnItemSelect event.
+		/// </summary>
+		public UnityEvent onItemSelect = new UnityEvent();
+
+		/// <summary>
+		/// onItemCancel event.
+		/// </summary>
+		public UnityEvent onItemCancel = new UnityEvent();
+
+		/// <summary>
 		/// The container for items objects.
 		/// </summary>
 		[SerializeField]
 		public Transform Container;
 
+		/// <summary>
+		/// OnFocusIn event.
+		/// </summary>
+		public ListViewFocusEvent OnFocusIn = new ListViewFocusEvent();
+		
+		/// <summary>
+		/// OnFocusOut event.
+		/// </summary>
+		public ListViewFocusEvent OnFocusOut = new ListViewFocusEvent();
+
 		GameObject unused;
+
+		void Awake()
+		{
+			Start();
+		}
+
+		[System.NonSerialized]
+		bool isStartedListViewBase;
 
 		/// <summary>
 		/// Start this instance.
 		/// </summary>
 		public virtual void Start()
 		{
+			if (isStartedListViewBase)
+			{
+				return ;
+			}
+			isStartedListViewBase = true;
+
 			unused = new GameObject("unused base");
 			unused.SetActive(false);
 			unused.transform.SetParent(transform, false);
+			if ((selectedIndex!=-1) && (selectedIndicies.Count==0))
+			{
+				selectedIndicies.Add(selectedIndex);
+			}
+			selectedIndicies = selectedIndicies.Where(x => IsValid(x)).ToList();
+			if (selectedIndicies.Count==0)
+			{
+				selectedIndex = -1;
+			}
 
 			//UpdateItems();
 		}
@@ -137,35 +198,114 @@ namespace UIWidgets
 			UpdateItems(items);
 		}
 
+		void RemoveCallback(ListViewItem item, int index)
+		{
+			if (item == null)
+			{
+				return;
+			}
+			if (callbacks.Count > index)
+			{
+				item.onClick.RemoveListener(callbacks[index]);
+			}
+			item.onSubmit.RemoveListener(Toggle);
+			item.onCancel.RemoveListener(OnItemCancel);
+
+			item.onSelect.RemoveListener(HighlightColoring);
+			item.onDeselect.RemoveListener(Coloring);
+
+			item.onMove.RemoveListener(OnItemMove);
+		}
+
+		void OnItemCancel(ListViewItem item)
+		{
+			if (EventSystem.current.alreadySelecting)
+			{
+				return;
+			}
+
+			EventSystem.current.SetSelectedGameObject(gameObject);
+
+			onItemCancel.Invoke();
+		}
+
 		void RemoveCallbacks()
 		{
 			if (callbacks.Count > 0)
 			{
-				items.ForEach((item, index) => {
-					if (item==null)
-					{
-						return ;
-					}
-					if (callbacks.Count > index)
-					{
-						item.onPointerClick.RemoveListener(callbacks[index]);
-					}
-				});
+				items.ForEach(RemoveCallback);
 			}
 			callbacks.Clear();
 		}
 		
 		void AddCallbacks()
 		{
-			items.ForEach((item, index) => AddCallback(item, index));
+			items.ForEach(AddCallback);
 		}
 
 		void AddCallback(ListViewItem item, int index)
 		{
-			callbacks.Add(ev => Toggle(index));
-			
-			item.onPointerClick.AddListener(callbacks[index]);
+			callbacks.Insert(index, () => {
+				Toggle(item);
+			});
+
+			item.onClick.AddListener(callbacks[index]);
+
+			item.onSubmit.AddListener(OnItemSubmit);
+			item.onCancel.AddListener(OnItemCancel);
+
+			item.onSelect.AddListener(HighlightColoring);
+			item.onDeselect.AddListener(Coloring);
+
+			item.onMove.AddListener(OnItemMove);
 		}
+
+		void OnItemSelect(ListViewItem item)
+		{
+			onItemSelect.Invoke();
+		}
+
+		void OnItemSubmit(ListViewItem item)
+		{
+			Toggle(item);
+			if (!IsSelected(item.Index))
+			{
+				HighlightColoring(item);
+			}
+		}
+		
+		void OnItemMove(AxisEventData eventData, ListViewItem item)
+		{
+			switch (eventData.moveDir)
+			{
+				case MoveDirection.Left:
+					break;
+				case MoveDirection.Right:
+					break;
+				case MoveDirection.Up:
+					if (item.Index > 0)
+					{
+						SelectComponentByIndex(item.Index - 1);
+						//EventSystem.current.SetSelectedGameObject(GetItem(item.Index - 1).gameObject);
+						//ScrollTo(item.Index - 1);
+					}
+					break;
+				case MoveDirection.Down:
+					if (IsValid(item.Index + 1))
+					{
+						SelectComponentByIndex(item.Index + 1);
+						//EventSystem.current.SetSelectedGameObject(GetItem(item.Index + 1).gameObject);
+						//ScrollTo(item.Index + 1);
+					}
+					break;
+			}
+		}
+
+		protected virtual void ScrollTo(int index)
+		{
+
+		}
+
 
 		/// <summary>
 		/// Add the specified item.
@@ -178,6 +318,7 @@ namespace UIWidgets
 			AddCallback(item, items.Count);
 
 			items.Add(item);
+			item.Index = callbacks.Count - 1;
 
 			return callbacks.Count - 1;
 		}
@@ -200,7 +341,7 @@ namespace UIWidgets
 		{
 			RemoveCallbacks();
 
-			var index = items.FindIndex(x => x==item);
+			var index = item.Index;
 
 			selectedIndicies = selectedIndicies.Where(x => x!=index).Select(x => x > index ? x-- : x).ToList();
 			if (selectedIndex==index)
@@ -251,12 +392,13 @@ namespace UIWidgets
 
 			items.Where(item => !newItems.Contains(item)).ForEach(item => Free(item));
 
-			newItems.ForEach(x => {
+			newItems.ForEach((x, i) => {
+				x.Index = i;
 				x.transform.SetParent(Container, false);
 			});
 
-			selectedIndicies.Clear();
-			selectedIndex = -1;
+			//selectedIndicies.Clear();
+			//selectedIndex = -1;
 
 			items = newItems;
 
@@ -268,24 +410,35 @@ namespace UIWidgets
 		/// </summary>
 		/// <returns><c>true</c> if item exists with the specified index; otherwise, <c>false</c>.</returns>
 		/// <param name="index">Index.</param>
-		public bool IsValid(int index)
+		public virtual bool IsValid(int index)
 		{
 			return (index >= 0) && (index < items.Count);
+		}
+
+		/// <summary>
+		/// Gets the item.
+		/// </summary>
+		/// <returns>The item.</returns>
+		/// <param name="index">Index.</param>
+		protected ListViewItem GetItem(int index)
+		{
+			return items.Find(x => x.Index==index);
 		}
 
 		/// <summary>
 		/// Select item by the specified index.
 		/// </summary>
 		/// <param name="index">Index.</param>
-		public void Select(int index)
+		public virtual void Select(int index)
 		{
 			if (index==-1)
 			{
 				return ;
 			}
+
 			if (!IsValid(index))
 			{
-				var message = string.Format("Index must be between 0 and Items.Count ({0}). Gameobject {1}.", items.Count, name);
+				var message = string.Format("Index must be between 0 and Items.Count ({0}). Gameobject {1}.", items.Count - 1, name);
 				throw new IndexOutOfRangeException(message);
 			}
 
@@ -309,7 +462,7 @@ namespace UIWidgets
 
 			SelectItem(index);
 
-			OnSelect.Invoke(index, items[index]);
+			OnSelect.Invoke(index, GetItem(index));
 		}
 
 		/// <summary>
@@ -334,7 +487,7 @@ namespace UIWidgets
 
 			DeselectItem(index);
 			
-			OnDeselect.Invoke(index, items[index]);
+			OnDeselect.Invoke(index, GetItem(index));
 		}
 
 		/// <summary>
@@ -364,6 +517,15 @@ namespace UIWidgets
 		}
 
 		/// <summary>
+		/// Toggle the specified item.
+		/// </summary>
+		/// <param name="item">Item.</param>
+		void Toggle(ListViewItem item)
+		{
+			Toggle(item.Index);
+		}
+		
+		/// <summary>
 		/// Called when item selected.
 		/// Use it for change visible style of selected item.
 		/// </summary>
@@ -384,6 +546,22 @@ namespace UIWidgets
 		}
 
 		/// <summary>
+		/// Coloring the specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void Coloring(ListViewItem component)
+		{
+		}
+		
+		/// <summary>
+		/// Set highlights colors of specified component.
+		/// </summary>
+		/// <param name="component">Component.</param>
+		protected virtual void HighlightColoring(ListViewItem component)
+		{
+		}
+
+		/// <summary>
 		/// This function is called when the MonoBehaviour will be destroyed.
 		/// </summary>
 		protected virtual void OnDestroy()
@@ -394,14 +572,31 @@ namespace UIWidgets
 		}
 
 		/// <summary>
-		/// OnFocusIn event.
+		/// Set EventSystem.current.SetSelectedGameObject with selected or first item.
 		/// </summary>
-		public UnityEvent OnFocusIn = new UnityEvent();
+		/// <returns><c>true</c>, if component was selected, <c>false</c> otherwise.</returns>
+		public virtual bool SelectComponent()
+		{
+			if (items.Count==0)
+			{
+				return false;
+			}
+			var index = (SelectedIndex!=-1) ? SelectedIndex : 0;
+			SelectComponentByIndex(index);
 
-		/// <summary>
-		/// OnFocusOut event.
-		/// </summary>
-		public UnityEvent OnFocusOut = new UnityEvent();
+			return true;
+		}
+
+		void SelectComponentByIndex(int index)
+		{
+			ScrollTo(index);
+			
+			var ev = new ListViewItemEventData(EventSystem.current) {
+				NewSelectedObject = GetItem(index).gameObject
+			};
+			ExecuteEvents.Execute<ISelectHandler>(ev.NewSelectedObject, ev, ExecuteEvents.selectHandler);
+			//EventSystem.current.SetSelectedGameObject(ev.NewSelectedObject, ev);
+		}
 
 		/// <summary>
 		/// Raises the select event.
@@ -409,7 +604,11 @@ namespace UIWidgets
 		/// <param name="eventData">Event data.</param>
 		void ISelectHandler.OnSelect(BaseEventData eventData)
 		{
-			OnFocusIn.Invoke();
+			if (!EventSystem.current.alreadySelecting)
+			{
+				EventSystem.current.SetSelectedGameObject(gameObject);
+			}
+			OnFocusIn.Invoke(eventData);
 		}
 
 		/// <summary>
@@ -418,7 +617,26 @@ namespace UIWidgets
 		/// <param name="eventData">Current event data.</param>
 		void IDeselectHandler.OnDeselect(BaseEventData eventData)
 		{
-			OnFocusOut.Invoke();
+			OnFocusOut.Invoke(eventData);
+		}
+
+		/// <summary>
+		/// Raises the submit event.
+		/// </summary>
+		/// <param name="eventData">Event data.</param>
+		void ISubmitHandler.OnSubmit(BaseEventData eventData)
+		{
+			SelectComponent();
+			onSubmit.Invoke();
+		}
+
+		/// <summary>
+		/// Raises the cancel event.
+		/// </summary>
+		/// <param name="eventData">Event data.</param>
+		void ICancelHandler.OnCancel(BaseEventData eventData)
+		{
+			onCancel.Invoke();
 		}
 	}
 }
