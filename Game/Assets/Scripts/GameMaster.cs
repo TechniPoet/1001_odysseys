@@ -22,28 +22,37 @@ public class GameMaster
 	#endregion
 	Phase1Manager p1;
 	Dictionary<string, Encounter> encounters;
-	public HashSet<string> planetList;
-	Dictionary<string, HashSet<string>> planetEncounters;
+	public List<string> planetList;
+	Dictionary<string, List<string>> planetEncounters;
 	string currentPlanet;
+	Encounter currentEncounter;
 	public string CurrentPlanet
 	{
 		get { return currentPlanet; }
 		set
 		{
 			currentPlanet = value;
+			SetEncounter();
 		}
+	}
+
+	public Encounter CurrentEncounter
+	{
+		get { return currentEncounter; }
 	}
 
 	GameMaster()
 	{
 		encounters = new Dictionary<string, Encounter>();
-		planetList = new HashSet<string>();
-		planetEncounters = new Dictionary<string, HashSet<string>>();
+		planetList = new List<string>();
+		planetEncounters = new Dictionary<string, List<string>>();
+
 	}
 
 	public void LoadEncounters()
 	{
-		foreach (string s in XMLUtility.ReadIndex())
+		HashSet<string> encounterFiles = XMLUtility.ReadIndex();
+		foreach (string s in encounterFiles)
 		{
 			Encounter temp;
 			temp = XMLUtility.ReadEncounter(s);
@@ -52,21 +61,30 @@ public class GameMaster
 		foreach (KeyValuePair<string, Encounter> kp in encounters)
 		{
 			Encounter tempE = kp.Value;
-			HashSet<string> tempHashset;
+			List<string> tempList;
 			for (int i = 0; i < tempE.planets.Count; i++)
 			{
 				if (planetList.Contains(tempE.planets[i]))
 				{
-					tempHashset = planetEncounters[tempE.planets[i]];
-					tempHashset.Add(tempE.id);
+					tempList = planetEncounters[tempE.planets[i]];
+					tempList.Add(tempE.id);
 				}
 				else
 				{
-					tempHashset = new HashSet<string>();
-					tempHashset.Add(tempE.id);
-					planetEncounters.Add(tempE.planets[i], tempHashset);
+					planetList.Add(tempE.planets[i]);
+					tempList = new List<string>();
+					tempList.Add(tempE.id);
+					planetEncounters.Add(tempE.planets[i], tempList);
 				}
 			}
 		}
+	}
+
+	public void SetEncounter()
+	{
+		List<string> currentEncounters = planetEncounters[currentPlanet];
+		int randNum = Random.Range(0, currentEncounters.Count - 1);
+		string currEncID = currentEncounters[randNum];
+		currentEncounter = encounters[currEncID];
 	}
 }

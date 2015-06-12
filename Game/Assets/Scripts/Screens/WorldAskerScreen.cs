@@ -9,8 +9,6 @@ public class WorldAskerScreen : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		gm = GameMaster.Instance();
-		//worldCombo.ListView.Add("Endor");
-		//worldCombo.ListView.Add("Volcan");
 		worldCombo.ListView.Remove("Item 1");
 		worldCombo.ListView.Remove("Item 2");
 		worldCombo.ListView.Remove("Item 3");
@@ -20,7 +18,7 @@ public class WorldAskerScreen : MonoBehaviour {
 		{
 			worldCombo.ListView.Add(planet);
 		}
-			worldCombo.ListView.Select(0);
+		worldCombo.ListView.Select(0);
 	}
 	
 	// Update is called once per frame

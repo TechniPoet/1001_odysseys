@@ -19,7 +19,14 @@ public class Phase1Manager : MonoBehaviour {
 
 	public void StartEncounter()
 	{
+		StartCoroutine("PauseThenStartEncounter");
+	}
+
+	public IEnumerator PauseThenStartEncounter()
+	{
+		yield return new WaitForEndOfFrame();
 		WorldAsker.SetActive(false);
 		Encounter.SetActive(true);
+		yield return null;
 	}
 }

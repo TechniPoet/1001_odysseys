@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml;
 
-public class XMLUtility
+public static class XMLUtility
 {
 	#region Encounter Elements and Attributes
 	const string ENCOUNTER_ELEMENT = "encounter";
@@ -26,7 +26,8 @@ public class XMLUtility
 	const string FAILURE_ELEMENT = "failure";
 	const string ADD_ELEMENT = "add";
 	#endregion
-	const string INDEX_FILE = "index.xml";
+	const string INDEX_FILE = "index";
+
 
 	public static HashSet<string> ReadIndex()
 	{
@@ -45,6 +46,7 @@ public class XMLUtility
 
 	public static Encounter ReadEncounter(string fileName)
 	{
+		Debug.Log("Reading in encounter " + fileName);
 		Encounter encounterCurr = new Encounter();
 		// Load file.
 		XmlDocument xmlDoc = new XmlDocument();
@@ -56,23 +58,36 @@ public class XMLUtility
 		ReadEncounterAttributes(encounterNode, ref encounterCurr);
 
 		XmlNodeList childNodes = encounterNode.ChildNodes;
-		foreach (XmlNode node in childNodes)
+		try
 		{
-			switch (node.Name)
+			foreach (XmlNode node in childNodes)
 			{
-				case TITLE_ELEMENT:
-					encounterCurr.title = node.Value;
-					break;
-				case DESC_ELEMENT:
-					encounterCurr.description = node.Value;
-					break;
-				case TRIGGER_ELEMENT:
-					break;
-				case CHOICES_ELEMENT:
-					break;
-				default:
-					break;
+				switch (node.Name)
+				{
+					case TITLE_ELEMENT:
+						Debug.Log("reading in title");
+						encounterCurr.title = node.InnerText;
+						break;
+					case DESC_ELEMENT:
+						Debug.Log("reading in description");
+						encounterCurr.description = node.InnerText;
+						break;
+					case TRIGGER_ELEMENT:
+						Debug.Log("reading in trigger element");
+						ReadTriggerElement(node, ref encounterCurr);
+						break;
+					case CHOICES_ELEMENT:
+						Debug.Log("reading in choices element");
+						ReadChoicesElement(node, ref encounterCurr);
+						break;
+					default:
+						break;
+				}
 			}
+		}
+		catch (System.Exception e)
+		{
+			Debug.LogErrorFormat("Exception" + e.Message);
 		}
 		return encounterCurr;
 	}
@@ -101,10 +116,26 @@ public class XMLUtility
 			switch (n.Name)
 			{
 				case LOCATIONS_ELEMENT:
-					// read in locations.
+					Debug.Log("reading in locations");
+					ReadLocations(n, ref encounterCurr);
 					break;
 				case CREW_INFO_ELEMENT:
 					//read in crew info.
+					break;
+			}
+		}
+	}
+
+
+	static void ReadLocations(XmlNode node, ref Encounter encounterCurr)
+	{
+		foreach (XmlNode n in node.ChildNodes)
+		{
+			switch (n.Name)
+			{
+				case LOCATION_ELEMENT:
+					Debug.Log("reading in location");
+					encounterCurr.planets.Add(n.InnerText);
 					break;
 			}
 		}
@@ -118,11 +149,14 @@ public class XMLUtility
 			switch (n.Name)
 			{
 				case OPTION_ELEMENT:
+					Debug.Log("reading in " + OPTION_ELEMENT);
 					Option newOption = new Option();
-					newOption.choiceText = n.SelectSingleNode(TEXT_ELEMENT).Value;
-					XmlNode c = n.SelectSingleNode(ROLL_TEXT_ELEMENT);
-					XmlNode success = c.SelectSingleNode(SUCCESS_ELEMENT);
-					XmlNode dice = c.SelectSingleNode(DICE_ELEMENT);
+					Debug.Log("reading in " + TEXT_ELEMENT);
+					newOption.choiceText = n.SelectSingleNode(TEXT_ELEMENT).InnerText;
+					
+					XmlNode success = n.SelectSingleNode(SUCCESS_ELEMENT);
+					Debug.Log("reading in " + DICE_ELEMENT);
+					XmlNode dice = n.SelectSingleNode(DICE_ELEMENT);
 
 					foreach (XmlAttribute x in dice.Attributes)
 					{
@@ -136,6 +170,7 @@ public class XMLUtility
 								break;
 						}
 					}
+					Debug.Log("reading in " + SUCCESS_ELEMENT);
 					foreach (XmlAttribute x in success.Attributes)
 					{
 						switch (x.Name)
@@ -145,9 +180,12 @@ public class XMLUtility
 								break;
 						}
 					}
-					newOption.successText = success.SelectSingleNode(TEXT_ELEMENT).Value;
-					newOption.rollText = c.SelectSingleNode(ROLL_TEXT_ELEMENT).Value;
-					newOption.failText = c.SelectSingleNode(FAILURE_ELEMENT).SelectSingleNode(TEXT_ELEMENT).Value;
+					Debug.Log("reading in " + SUCCESS_ELEMENT + " " + TEXT_ELEMENT);
+					newOption.successText = success.SelectSingleNode(TEXT_ELEMENT).InnerText;
+					Debug.Log("reading in " + ROLL_TEXT_ELEMENT);
+					newOption.rollText = n.SelectSingleNode(ROLL_TEXT_ELEMENT).InnerText;
+					Debug.Log("reading in " + FAILURE_ELEMENT + " " + TEXT_ELEMENT);
+					newOption.failText = n.SelectSingleNode(FAILURE_ELEMENT).SelectSingleNode(TEXT_ELEMENT).InnerText;
 					encounterCurr.options.Add(newOption);
 					break;
 			}

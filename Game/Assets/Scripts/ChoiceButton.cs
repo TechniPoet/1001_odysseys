@@ -5,21 +5,20 @@ using System.Collections;
 public class ChoiceButton : MonoBehaviour{
 	public Image selectedMarker;
 	public Text text;
-	public int choiceNum = -1;
-	EncounterScreen parent;
+	int choiceNum = -1;
+	EncounterManager parent;
 
 	// Use this for initialization
 	void Start () {
-		parent = GetComponentInParent<EncounterScreen>();
-		if (parent == null)
-		{
-			throw new System.Exception("Could not find Parent EncounterScreen script");
-		}
-		if (choiceNum < 0)
-		{
-			throw new System.Exception("choice number not set");
-		}
-		parent.AddChoice(choiceNum, this);
+	}
+
+
+	public void SetChoiceButton(int num, string newText, EncounterManager newParent)
+	{
+		choiceNum = num;
+		text.text = newText;
+		parent = newParent;
+		this.gameObject.SetActive(true);
 	}
 
 
