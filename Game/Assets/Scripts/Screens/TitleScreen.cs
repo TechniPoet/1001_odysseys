@@ -4,8 +4,9 @@ using System.Collections;
 public class TitleScreen : MonoBehaviour {
 
 	// Use this for initialization
-	void Start () {
-		GameMaster.Instance().LoadEncounters();
+	void Start () 
+	{
+		
 	}
 
 
@@ -33,6 +34,7 @@ public class TitleScreen : MonoBehaviour {
 	public void OpenWebsite()
 	{
 		Debug.Log("Opening Website");
+		Application.OpenURL("www.google.com");
 	}
 
 

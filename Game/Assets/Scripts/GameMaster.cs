@@ -85,6 +85,7 @@ public class GameMaster
 		List<string> currentEncounters = planetEncounters[currentPlanet];
 		int randNum = Random.Range(0, currentEncounters.Count - 1);
 		string currEncID = currentEncounters[randNum];
+		Debug.Log("current encounter set to " + currEncID);
 		currentEncounter = encounters[currEncID];
 	}
 }

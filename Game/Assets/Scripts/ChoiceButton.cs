@@ -6,14 +6,14 @@ public class ChoiceButton : MonoBehaviour{
 	public Image selectedMarker;
 	public Text text;
 	int choiceNum = -1;
-	EncounterManager parent;
+	EncounterChoiceScreen parent;
 
 	// Use this for initialization
 	void Start () {
 	}
 
 
-	public void SetChoiceButton(int num, string newText, EncounterManager newParent)
+	public void SetChoiceButton(int num, string newText, EncounterChoiceScreen newParent)
 	{
 		choiceNum = num;
 		text.text = newText;

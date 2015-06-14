@@ -1,37 +1,26 @@
 ﻿using UnityEngine;
-using UnityEngine.UI;
+
 using System.Collections;
 
-public class EncounterManager : MonoBehaviour {
+public class EncounterManager : MonoBehaviour 
+{
 	public GameObject encounterChoices;
 	public GameObject encounterInstructs;
 	public GameObject encounterResults;
-	public ChoiceButton[] choices;
-	public Text title;
-	public Text description;
 
-	bool choiceChosen = false;
-	int chosenChoiceIndex = -1;
-	Encounter currEncounter;
-	
-
-	// Use this for initialization
-	void Start () {
-		
-	}
+	public EncounterChoiceScreen choiceScreen;
+	public EncounterRollScreen rollScreen;
+	public EncounterResultScreen resultScreen;
+	int choiceIndex = 0;
 
 	void Awake()
 	{
-		currEncounter = GameMaster.Instance().CurrentEncounter;
-		Debug.Log(currEncounter.options.Count + " choices");
-		for (int i = 0; i < currEncounter.options.Count; i++)
-		{
-			Option tempOpt = currEncounter.options[i];
-			choices[i].SetChoiceButton(i, tempOpt.choiceText, this);
-			Debug.Log("starting " + i);
-		}
-		title.text = currEncounter.title;
-		description.text = currEncounter.description;
+		choiceScreen.manager = this;
+		rollScreen.manager = this;
+
+		encounterChoices.SetActive(true);
+		encounterInstructs.SetActive(false);
+		encounterResults.SetActive(false);
 	}
 	
 	// Update is called once per frame
@@ -39,39 +28,32 @@ public class EncounterManager : MonoBehaviour {
 	
 	}
 
-
-	/// <summary>
-	/// Callback function for when the submit button is clicked.
-	/// </summary>
-	public void Submit()
+	public void MoveToRoll(int choiceNum)
 	{
-		if (choiceChosen)
-		{
-			Debug.LogFormat("Submit choice {0}!", chosenChoiceIndex);
-
-		}
-		else
-		{
-			Debug.Log("No choice chosen");
-		}
+		choiceIndex = choiceNum;
+		rollScreen.SetupScreen(choiceNum);
+		encounterChoices.SetActive(false);
+		encounterResults.SetActive(false);
+		encounterInstructs.SetActive(true);
 	}
 
 
-	/// <summary>
-	/// Method called by choices when they are clicked.
-	/// marks given choice as selected and marks the rest unselected.
-	/// </summary>
-	/// <param name="choiceNum"></param>
-	public void ChoiceClicked(int choiceNum)
+	public void MoveToResults(bool success)
 	{
-		choiceChosen = true;
-		chosenChoiceIndex = choiceNum;
-		for (int i = 0; i < choices.Length; i++ )
-		{
-			if (choices[i] != null)
-			{
-				choices[i].Select(i == choiceNum);
-			}
-		}
+		resultScreen.SetupResult(choiceIndex, success);
+		encounterChoices.SetActive(false);
+		encounterResults.SetActive(true);
+		encounterInstructs.SetActive(false);
 	}
+
+	public void MoveToMainMenu()
+	{
+		Application.LoadLevel("TitleScreen");
+	}
+
+	public void MoveToNextEncounter()
+	{
+		Application.LoadLevel("Phase1");
+	}
+
 }

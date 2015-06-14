@@ -12,6 +12,12 @@ public class Phase1Manager : MonoBehaviour {
 		singleton = this;
 	}
 
+	void Awake()
+	{
+		WorldAsker.SetActive(true);
+		Encounter.SetActive(false);
+	}
+
 	public static Phase1Manager Instance()
 	{
 		return singleton;
