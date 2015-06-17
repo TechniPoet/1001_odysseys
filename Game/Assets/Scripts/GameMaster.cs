@@ -51,11 +51,12 @@ public class GameMaster
 
 	public void LoadEncounters()
 	{
-		HashSet<string> encounterFiles = XMLUtility.ReadIndex();
+		//HashSet<string> encounterFiles = XMLUtility.ReadIndex();
+		HashSet<string> encounterFiles = XMLUtility.ReadDevIndex();
 		foreach (string s in encounterFiles)
 		{
 			Encounter temp;
-			temp = XMLUtility.ReadEncounter(s);
+			temp = XMLUtility.ReadEncounter(s, true);
 			encounters.Add(temp.id, temp);
 		}
 		foreach (KeyValuePair<string, Encounter> kp in encounters)

@@ -44,15 +44,39 @@ public static class XMLUtility
 		return encounters;
 	}
 
-	public static Encounter ReadEncounter(string fileName)
+	public static HashSet<string> ReadDevIndex()
+	{
+		HashSet<string> encounters = new HashSet<string>();
+		XmlDocument xmlDoc = new XmlDocument();
+		TextAsset xmlData = new TextAsset();
+		XmlTextReader reader = new XmlTextReader("C:/1001Devs/" + INDEX_FILE + ".xml");
+		xmlDoc.Load(reader);
+		XmlNode filesNode = xmlDoc.GetElementsByTagName("encounterfiles")[0];
+		foreach (XmlNode x in filesNode.ChildNodes)
+		{
+			encounters.Add(x.Attributes["fileName"].Value);
+		}
+		return encounters;
+	}
+
+	public static Encounter ReadEncounter(string fileName, bool dev)
 	{
 		Debug.Log("Reading in encounter " + fileName);
 		Encounter encounterCurr = new Encounter();
 		// Load file.
 		XmlDocument xmlDoc = new XmlDocument();
-		TextAsset xmlData = new TextAsset();
-		xmlData = (TextAsset)Resources.Load("Encounters/" + fileName, typeof(TextAsset));
-		xmlDoc.LoadXml(xmlData.text);
+		if (dev)
+		{
+			XmlTextReader reader = new XmlTextReader("C:/1001Devs/Encounters/" + fileName + ".xml");
+			xmlDoc.Load(reader);
+		}
+		else
+		{
+			TextAsset xmlData = new TextAsset();
+			xmlData = (TextAsset)Resources.Load("Encounters/" + fileName, typeof(TextAsset));
+			xmlDoc.LoadXml(xmlData.text);
+		}
+		
 		// Get encapsolating encounter node.
 		XmlNode encounterNode = xmlDoc.GetElementsByTagName(ENCOUNTER_ELEMENT)[0];
 		ReadEncounterAttributes(encounterNode, ref encounterCurr);
