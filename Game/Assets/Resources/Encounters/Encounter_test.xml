@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='utf-8'?>
+<encounter id="end-0">
+	<title>Test Encounter!</title>
+	<description>
+		 Collect samples of the native plant species for further study.
+	</description>
+
+	<trigger>
+		<!--anything that may trigger this event-->
+		<locations>
+			<!-- locations where this can happen-->
+			<location>Endor</location>
+			<location>Volcan</location>
+		</locations>
+		
+		<crewinfo>
+			<!-- pre-reqs for crew for this to happen-->
+			
+			<crew self="false">
+				<!-- self=true: these must apply to current player-->
+				<!-- self=false: these must apply to someone in crew-->
+				<race>volcan</race>
+			</crew>
+		</crewinfo>
+	</trigger>
+
+	<choices>
+
+		<option>
+			<text>[Requires Biologist] Carefully collect just the seeds, leaving the area undisturbed.</text>
+			
+			<roll_text>Roll Leaf Skill</roll_text>
+			<dice min="0" max="4"/>
+			<success min="2">
+				<text>You collect the seed pods with care and give them a well-needed dust-off before storing them in your Plant-O Container.</text>
+				<add self="true" item="credit" amount="10"/>
+			</success>
+			<failure>
+				<text>The seed pods crumble in your hand, and you clumsily brush them off with your feet. Congratulations on desecrating a national resource!</text>
+			</failure>
+			
+		</option>
+
+		<option>
+			<text>[Requires Plumplim] Convince the plants to uproot themselves with specially tuned vibrations into your open containers.</text>
+			
+			<roll_text>Roll Leaf Skill</roll_text>
+			<dice min="0" max="4"/>
+			<success min="2">
+				<text>The plants lurch themselves forth and float, swimmingly, into your open containers, waiting for further examination. Nice job.</text>
+				<add self="true" item="credit" amount="20"/>
+			</success>
+			<failure>
+				<text>Instead of uprooting themselves out of the ground, the heather seems to shake and shiver. Wait, did one just turn brown?</text>
+			</failure>
+			
+		</option>
+
+		<option>
+			<text>Use the scissors that are on the desk in the ship’s backroom. This can’t possibly be that hard, right?</text>
+		
+			<roll_text>Roll Sword Skill</roll_text>
+			<dice min="0" max="4"/>
+			<success min="2">
+				<text>It was that easy! You snip off the stems with ease and collect them in your pouch.</text>
+				<add self="true" item="credit" amount="10"/>
+			</success>
+			<failure>
+				<text>Uh-oh. You cut yourself on the plant’s thorns, and your hand swells up. \nWell, that’s embarrassing.</text>
+			</failure>
+	
+		</option>
+
+	</choices>
+</encounter>
